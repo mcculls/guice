@@ -133,7 +133,7 @@ public class BytecodeGenTest extends TestCase {
         // standard bootdelegation of java.*
         return super.loadClass(name, resolve);
 
-      } else if (!name.contains(".internal.") && !name.contains(".cglib.")) {
+      } else if (!name.contains(".internal.")) {
 
         /*
          * load public and test classes directly from the classpath - we don't
@@ -327,7 +327,7 @@ public class BytecodeGenTest extends TestCase {
     injector.getInstance(PackagePrivateInject.class).assertIsFastClassInvoked();
     injector.getInstance(PrivateInject.class).assertIsReflectionInvoked();
 
-    // This classloader will load the types in an loader with a different version of guice/cglib
+    // This classloader will load the types in an loader with a different version of guice
     // this prevents the use of fastclass for all but the public types (where the bridge
     // classloader can be used).
     MultipleVersionsOfGuiceClassLoader fakeLoader = new MultipleVersionsOfGuiceClassLoader();
@@ -346,8 +346,7 @@ public class BytecodeGenTest extends TestCase {
   }
 
   // This classloader simulates an OSGI environment where a bundle has a conflicting definition of
-  // cglib (or guice).  This is sort of the opposite of the BridgeClassloader and is meant to test
-  // its use.
+  // or guice. This is sort of the opposite of the BridgeClassloader and is meant to test its use.
   static class MultipleVersionsOfGuiceClassLoader extends URLClassLoader {
     MultipleVersionsOfGuiceClassLoader() {
       this(MultipleVersionsOfGuiceClassLoader.class.getClassLoader());
@@ -383,7 +382,6 @@ public class BytecodeGenTest extends TestCase {
           || name.startsWith("javax.")
           || name.equals(LogCreator.class.getName())
           || (!name.startsWith("com.google.inject.")
-              && !name.contains(".cglib.")
               && !name.startsWith("com.googlecode.guice"))) {
 
         // standard parent delegation
