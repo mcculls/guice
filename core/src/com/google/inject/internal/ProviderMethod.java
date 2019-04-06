@@ -49,10 +49,9 @@ public abstract class ProviderMethod<T> extends InternalProviderInstanceBindingI
   /**
    * Creates a {@link ProviderMethod}.
    *
-   * <p>Unless {@code skipFastClassGeneration} is set, this will use {@link
-   * net.sf.cglib.reflect.FastClass} to invoke the actual method, since it is significantly faster.
-   * However, this will fail if the method is {@code private} or {@code protected}, since fastclass
-   * is subject to java access policies.
+   * <p>Unless {@code skipFastClassGeneration} is set, this will use {@link FastClass} to invoke
+   * the actual method, since it is significantly faster. However, this will fail if the method
+   * is {@code private} or {@code protected}, since fastclass is subject to java access policies.
    */
   static <T> ProviderMethod<T> create(
       Key<T> key,
@@ -66,12 +65,12 @@ public abstract class ProviderMethod<T> extends InternalProviderInstanceBindingI
     /*if[AOP]*/
     if (!skipFastClassGeneration) {
       try {
-        net.sf.cglib.reflect.FastClass fc = BytecodeGen.newFastClassForMember(method);
+        FastClass fc = BytecodeGen.newFastClassForMember(method);
         if (fc != null) {
           return new FastClassProviderMethod<T>(
               key, fc, method, instance, dependencies, scopeAnnotation, annotation);
         }
-      } catch (net.sf.cglib.core.CodeGenerationException e) {
+      } catch (Exception | LinkageError e) {
         /* fall-through */
       }
     }
@@ -237,16 +236,16 @@ public abstract class ProviderMethod<T> extends InternalProviderInstanceBindingI
 
   /*if[AOP]*/
   /**
-   * A {@link ProviderMethod} implementation that uses {@link net.sf.cglib.reflect.FastClass#invoke}
-   * to invoke the provider method.
+   * A {@link ProviderMethod} implementation that uses {@link FastClass#invoke} to invoke the
+   * provider method.
    */
   private static final class FastClassProviderMethod<T> extends ProviderMethod<T> {
-    final net.sf.cglib.reflect.FastClass fastClass;
+    final FastClass fastClass;
     final int methodIndex;
 
     FastClassProviderMethod(
         Key<T> key,
-        net.sf.cglib.reflect.FastClass fc,
+        FastClass fc,
         Method method,
         Object instance,
         ImmutableSet<Dependency<?>> dependencies,
@@ -254,7 +253,7 @@ public abstract class ProviderMethod<T> extends InternalProviderInstanceBindingI
         Annotation annotation) {
       super(key, method, instance, dependencies, scopeAnnotation, annotation);
       this.fastClass = fc;
-      this.methodIndex = fc.getMethod(method).getIndex();
+      this.methodIndex = fc.getMethodIndex(method.getName(), method.getParameterTypes());
     }
 
     @SuppressWarnings("unchecked")

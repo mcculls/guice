@@ -46,16 +46,16 @@ final class DefaultConstructionProxyFactory<T> implements ConstructionProxyFacto
 
     /*if[AOP]*/
     try {
-      net.sf.cglib.reflect.FastClass fc = BytecodeGen.newFastClassForMember(constructor);
+      FastClass fc = BytecodeGen.newFastClassForMember(constructor);
       if (fc != null) {
-        int index = fc.getIndex(constructor.getParameterTypes());
+        int index = fc.getConstructorIndex(constructor.getParameterTypes());
         // We could just fall back to reflection in this case but I believe this should actually
         // be impossible.
         Preconditions.checkArgument(
             index >= 0, "Could not find constructor %s in fast class", constructor);
         return new FastClassProxy<T>(injectionPoint, constructor, fc, index);
       }
-    } catch (net.sf.cglib.core.CodeGenerationException e) {
+    } catch (Exception | LinkageError e) {
       /* fall-through */
     }
     /*end[AOP]*/
@@ -68,14 +68,11 @@ final class DefaultConstructionProxyFactory<T> implements ConstructionProxyFacto
   private static final class FastClassProxy<T> implements ConstructionProxy<T> {
     final InjectionPoint injectionPoint;
     final Constructor<T> constructor;
-    final net.sf.cglib.reflect.FastClass fc;
+    final FastClass fc;
     final int index;
 
     private FastClassProxy(
-        InjectionPoint injectionPoint,
-        Constructor<T> constructor,
-        net.sf.cglib.reflect.FastClass fc,
-        int index) {
+        InjectionPoint injectionPoint, Constructor<T> constructor, FastClass fc, int index) {
       this.injectionPoint = injectionPoint;
       this.constructor = constructor;
       this.fc = fc;
@@ -85,7 +82,6 @@ final class DefaultConstructionProxyFactory<T> implements ConstructionProxyFacto
     @Override
     @SuppressWarnings("unchecked")
     public T newInstance(Object... arguments) throws InvocationTargetException {
-      // Use this method instead of FastConstructor to save a stack frame
       return (T) fc.newInstance(index, arguments);
     }
 

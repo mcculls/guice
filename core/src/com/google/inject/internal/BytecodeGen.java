@@ -28,13 +28,12 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.security.AccessController;
 import java.security.PrivilegedAction;
-import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
  * Utility methods for runtime code generation and class loading. We use this stuff for {@link
- * net.sf.cglib.reflect.FastClass faster reflection}, {@link net.sf.cglib.proxy.Enhancer method
- * interceptors} and to proxy circular dependencies.
+ * FastClass faster reflection}, {@link Enhancer method interceptors} and to proxy circular
+ * dependencies.
  *
  * <p>When loading classes, we need to be careful of:
  *
@@ -76,51 +75,6 @@ public final class BytecodeGen {
   /** ie. "com.google.inject.internal" */
   static final String GUICE_INTERNAL_PACKAGE =
       BytecodeGen.class.getName().replaceFirst("\\.internal\\..*$", ".internal");
-
-  /*if[AOP]*/
-  /** either "net.sf.cglib", or "com.google.inject.internal.cglib" */
-  static final String CGLIB_PACKAGE =
-      net.sf.cglib.proxy.Enhancer.class.getName().replaceFirst("\\.cglib\\..*$", ".cglib");
-
-  static final net.sf.cglib.core.NamingPolicy FASTCLASS_NAMING_POLICY =
-      new net.sf.cglib.core.DefaultNamingPolicy() {
-        @Override
-        protected String getTag() {
-          return "ByGuice";
-        }
-
-        @Override
-        public String getClassName(
-            String prefix, String source, Object key, net.sf.cglib.core.Predicate names) {
-          // we explicitly set the source here to "FastClass" so that our jarjar renaming
-          // to $FastClass doesn't leak into the class names.  if we did not do this,
-          // classes would end up looking like $$$FastClassByGuice$$, with the extra $
-          // at the front.
-          return super.getClassName(prefix, "FastClass", key, names);
-        }
-      };
-
-  static final net.sf.cglib.core.NamingPolicy ENHANCER_NAMING_POLICY =
-      new net.sf.cglib.core.DefaultNamingPolicy() {
-        @Override
-        protected String getTag() {
-          return "ByGuice";
-        }
-
-        @Override
-        public String getClassName(
-            String prefix, String source, Object key, net.sf.cglib.core.Predicate names) {
-          // we explicitly set the source here to "Enhancer" so that our jarjar renaming
-          // to $Enhancer doesn't leak into the class names.  if we did not do this,
-          // classes would end up looking like $$$EnhancerByGuice$$, with the extra $
-          // at the front.
-          return super.getClassName(prefix, "Enhancer", key, names);
-        }
-      };
-  /*end[AOP]*/
-  /*if[NO_AOP]
-  private static final String CGLIB_PACKAGE = " "; // any string that's illegal in a package name
-  end[NO_AOP]*/
 
   /**
    * Weak cache of bridge class loaders that make the Guice implementation classes visible to
@@ -196,17 +150,6 @@ public final class BytecodeGen {
   }
 
   /*if[AOP]*/
-  // use fully-qualified names so imports don't need preprocessor statements
-  /**
-   * Returns a FastClass proxy for invoking the given member or {@code null} if access rules
-   * disallow it.
-   *
-   * @see #newFastClassForMember(Class, Member) for a full description
-   */
-  public static net.sf.cglib.reflect.FastClass newFastClassForMember(Member member) {
-    return newFastClassForMember(member.getDeclaringClass(), member);
-  }
-
   /**
    * Returns a FastClass proxy for invoking the given member or {@code null} if access rules
    * disallow it.
@@ -232,44 +175,15 @@ public final class BytecodeGen {
    * If we are unable to generate the type, then we return null and callers should work around by
    * using normal java reflection.
    */
-  public static net.sf.cglib.reflect.FastClass newFastClassForMember(Class<?> type, Member member) {
-    if (!new net.sf.cglib.core.VisibilityPredicate(type, false).evaluate(member)) {
-      // the member cannot be indexed by fast class.  Bail out.
-      return null;
-    }
-
-    boolean publiclyCallable = isPubliclyCallable(member);
-    if (!publiclyCallable && !hasSameVersionOfCglib(type.getClassLoader())) {
-      // The type is in a classloader with a different version of cglib and is not publicly visible
-      // (so we can't use the bridge classloader to work around).  Bail out.
-      return null;
-    }
-    net.sf.cglib.reflect.FastClass.Generator generator =
-        new net.sf.cglib.reflect.FastClass.Generator();
-    if (publiclyCallable) {
-      // Use the bridge classloader if we can
-      generator.setClassLoader(getClassLoader(type));
-    }
-    generator.setType(type);
-    generator.setNamingPolicy(FASTCLASS_NAMING_POLICY);
-    if (logger.isLoggable(Level.FINE)) {
-      logger.fine("Loading " + type + " FastClass with " + generator.getClassLoader());
-    }
-    return generator.create();
+  public static FastClass newFastClassForMember(Member member) {
+    throw new UnsupportedOperationException();
   }
 
   /**
-   * Returns true if the types classloader has the same version of cglib that BytecodeGen has. This
-   * only returns false in strange OSGI situations, but it prevents us from using FastClass for non
-   * public members.
+   * Returns an Enhancer that can generate subclasses of the type with additional behaviour.
    */
-  private static boolean hasSameVersionOfCglib(ClassLoader classLoader) {
-    Class<?> fc = net.sf.cglib.reflect.FastClass.class;
-    try {
-      return classLoader.loadClass(fc.getName()) == fc;
-    } catch (ClassNotFoundException e) {
-      return false;
-    }
+  public static Enhancer newEnhancerForClass(Class<?> type) {
+    throw new UnsupportedOperationException();
   }
 
   /**
@@ -296,18 +210,6 @@ public final class BytecodeGen {
       }
     }
     return true;
-  }
-
-  public static net.sf.cglib.proxy.Enhancer newEnhancer(Class<?> type, Visibility visibility) {
-    net.sf.cglib.proxy.Enhancer enhancer = new net.sf.cglib.proxy.Enhancer();
-    enhancer.setSuperclass(type);
-    enhancer.setUseFactory(false);
-    if (visibility == Visibility.PUBLIC) {
-      enhancer.setClassLoader(getClassLoader(type));
-    }
-    enhancer.setNamingPolicy(ENHANCER_NAMING_POLICY);
-    logger.fine("Loading " + type + " Enhancer with " + enhancer.getClassLoader());
-    return enhancer;
   }
   /*end[AOP]*/
 
@@ -400,7 +302,7 @@ public final class BytecodeGen {
         return SystemBridgeHolder.SYSTEM_BRIDGE.classicLoadClass(name, resolve);
       }
 
-      if (name.startsWith(GUICE_INTERNAL_PACKAGE) || name.startsWith(CGLIB_PACKAGE)) {
+      if (name.startsWith(GUICE_INTERNAL_PACKAGE)) {
         if (null == GUICE_CLASS_LOADER) {
           // use special system bridge to load classes from bootstrap class loader
           return SystemBridgeHolder.SYSTEM_BRIDGE.classicLoadClass(name, resolve);

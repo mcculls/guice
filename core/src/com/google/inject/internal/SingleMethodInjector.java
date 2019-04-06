@@ -40,9 +40,9 @@ final class SingleMethodInjector implements SingleMemberInjector {
 
     /*if[AOP]*/
     try {
-      final net.sf.cglib.reflect.FastClass fastClass = BytecodeGen.newFastClassForMember(method);
+      final FastClass fastClass = BytecodeGen.newFastClassForMember(method);
       if (fastClass != null) {
-        final int index = fastClass.getMethod(method).getIndex();
+        final int index = fastClass.getMethodIndex(method.getName(), method.getParameterTypes());
 
         return new MethodInvoker() {
           @Override
@@ -52,7 +52,7 @@ final class SingleMethodInjector implements SingleMemberInjector {
           }
         };
       }
-    } catch (net.sf.cglib.core.CodeGenerationException e) {
+    } catch (Exception | LinkageError e) {
       /* fall-through */
     }
     /*end[AOP]*/
