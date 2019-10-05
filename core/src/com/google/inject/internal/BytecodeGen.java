@@ -55,24 +55,29 @@ public final class BytecodeGen {
 
   /*if[AOP]*/
 
+  /** Creates a fast invoker for the given constructor using bytecode generation. */
   public static Function<Object[], Object> newFastInvoker(Constructor<?> constructor) {
     throw new UnsupportedOperationException();
   }
 
+  /** Creates a fast invoker for the given method using bytecode generation. */
   public static BiFunction<Object, Object[], Object> newFastInvoker(Method method) {
     throw new UnsupportedOperationException();
   }
 
+  /** Lists the methods in the given type that can be enhanced. */
   public static Method[] getEnhanceableMethods(Class<?> type) {
     throw new UnsupportedOperationException();
   }
 
-  public static BiFunction<Object, Object[], Object> newSuperInvoker(Method method) {
+  /** Creates an enhancer for the given constructor's type using bytecode generation. */
+  public static BiFunction<Object[], InvocationHandler[], Object> newEnhancer(
+      Constructor<?> constructor) {
     throw new UnsupportedOperationException();
   }
 
-  public static BiFunction<Object[], InvocationHandler[], Object> newEnhancer(
-      Constructor<?> constructor) {
+  /** Creates an invoker that calls the original unenhanced method using bytecode generation. */
+  public static BiFunction<Object, Object[], Object> newSuperInvoker(Method method) {
     throw new UnsupportedOperationException();
   }
 
