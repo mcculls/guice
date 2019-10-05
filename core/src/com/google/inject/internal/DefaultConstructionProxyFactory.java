@@ -59,7 +59,7 @@ final class DefaultConstructionProxyFactory<T> implements ConstructionProxyFacto
   }
 
   /*if[AOP]*/
-  /** A {@link ConstructionProxy} that uses FastClass to invoke the constructor. */
+  /** A {@link ConstructionProxy} that uses bytecode generation to invoke the constructor. */
   private static final class FastProxy<T> implements ConstructionProxy<T> {
     final InjectionPoint injectionPoint;
     final Constructor<T> constructor;

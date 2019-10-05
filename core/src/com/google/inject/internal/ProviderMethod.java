@@ -50,9 +50,9 @@ public abstract class ProviderMethod<T> extends InternalProviderInstanceBindingI
   /**
    * Creates a {@link ProviderMethod}.
    *
-   * <p>Unless {@code skipFastClassGeneration} is set, this will use {@link FastClass} to invoke
-   * the actual method, since it is significantly faster. However, this will fail if the method
-   * is {@code private} or {@code protected}, since fastclass is subject to java access policies.
+   * <p>Unless {@code skipFastClassGeneration} is set, this will use bytecode generation to invoke
+   * the actual method, since it is significantly faster. However, this will fail if the method is
+   * {@code private} or {@code protected}, since this approach is subject to java access policies.
    */
   static <T> ProviderMethod<T> create(
       Key<T> key,
