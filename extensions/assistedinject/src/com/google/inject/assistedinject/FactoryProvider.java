@@ -39,7 +39,6 @@ import java.lang.annotation.Annotation;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
-import java.lang.reflect.Proxy;
 import java.lang.reflect.Type;
 import java.util.List;
 import java.util.Map;
@@ -400,11 +399,7 @@ public class FactoryProvider<F> implements Provider<F>, HasDependencies {
 
     @SuppressWarnings("unchecked") // we imprecisely treat the class literal of T as a Class<T>
     Class<F> factoryRawType = (Class<F>) (Class<?>) factoryType.getRawType();
-    return factoryRawType.cast(
-        Proxy.newProxyInstance(
-            BytecodeGen.getClassLoader(factoryRawType),
-            new Class[] {factoryRawType},
-            invocationHandler));
+    return BytecodeGen.newProxy(factoryRawType, invocationHandler);
   }
 
   @Override

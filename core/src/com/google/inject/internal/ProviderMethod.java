@@ -37,6 +37,7 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.Set;
+import java.util.function.BiFunction;
 
 /**
  * A provider that invokes a method and returns its result.
@@ -65,10 +66,10 @@ public abstract class ProviderMethod<T> extends InternalProviderInstanceBindingI
     /*if[AOP]*/
     if (!skipFastClassGeneration) {
       try {
-        FastClass fc = BytecodeGen.newFastClassForMember(method);
-        if (fc != null) {
-          return new FastClassProviderMethod<T>(
-              key, fc, method, instance, dependencies, scopeAnnotation, annotation);
+        BiFunction<Object, Object[], Object> fastInvoker = BytecodeGen.newFastInvoker(method);
+        if (fastInvoker != null) {
+          return new FastProviderMethod<>(
+              fastInvoker, key, method, instance, dependencies, scopeAnnotation, annotation);
         }
       } catch (Exception | LinkageError e) {
         /* fall-through */
@@ -81,7 +82,7 @@ public abstract class ProviderMethod<T> extends InternalProviderInstanceBindingI
       method.setAccessible(true);
     }
 
-    return new ReflectionProviderMethod<T>(
+    return new ReflectionProviderMethod<>(
         key, method, instance, dependencies, scopeAnnotation, annotation);
   }
 
@@ -100,7 +101,7 @@ public abstract class ProviderMethod<T> extends InternalProviderInstanceBindingI
   private SingleParameterInjector<?>[] parameterInjectors;
 
   /** @param method the method to invoke. It's return type must be the same type as {@code key}. */
-  private ProviderMethod(
+  ProviderMethod(
       Key<T> key,
       Method method,
       Object instance,
@@ -236,31 +237,29 @@ public abstract class ProviderMethod<T> extends InternalProviderInstanceBindingI
 
   /*if[AOP]*/
   /**
-   * A {@link ProviderMethod} implementation that uses {@link FastClass#invoke} to invoke the
-   * provider method.
+   * A {@link ProviderMethod} implementation that uses {@link BytecodeGen} to invoke the provider
+   * method.
    */
-  private static final class FastClassProviderMethod<T> extends ProviderMethod<T> {
-    final FastClass fastClass;
-    final int methodIndex;
+  private static final class FastProviderMethod<T> extends ProviderMethod<T> {
+    final BiFunction<Object, Object[], Object> fastInvoker;
 
-    FastClassProviderMethod(
+    FastProviderMethod(
+        BiFunction<Object, Object[], Object> fastInvoker,
         Key<T> key,
-        FastClass fc,
         Method method,
         Object instance,
         ImmutableSet<Dependency<?>> dependencies,
         Class<? extends Annotation> scopeAnnotation,
         Annotation annotation) {
       super(key, method, instance, dependencies, scopeAnnotation, annotation);
-      this.fastClass = fc;
-      this.methodIndex = fc.getMethodIndex(method.getName(), method.getParameterTypes());
+      this.fastInvoker = fastInvoker;
     }
 
     @SuppressWarnings("unchecked")
     @Override
     public T doProvision(Object[] parameters)
         throws IllegalAccessException, InvocationTargetException {
-      return (T) fastClass.invoke(methodIndex, instance, parameters);
+      return (T) fastInvoker.apply(instance, parameters);
     }
   }
   /*end[AOP]*/

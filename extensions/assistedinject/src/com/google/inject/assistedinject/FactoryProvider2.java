@@ -63,7 +63,6 @@ import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
-import java.lang.reflect.Proxy;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
@@ -352,12 +351,7 @@ final class FactoryProvider2<F>
         assistDataBuilder.put(method, data);
       }
 
-      factory =
-          factoryRawType.cast(
-              Proxy.newProxyInstance(
-                  BytecodeGen.getClassLoader(factoryRawType),
-                  new Class<?>[] {factoryRawType},
-                  this));
+      factory = BytecodeGen.newProxy(factoryRawType, this);
 
       // Now go back through default methods. Try to use MethodHandles to make things
       // work.  If that doesn't work, fallback to trying to find compatible method

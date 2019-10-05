@@ -25,6 +25,7 @@ import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.List;
+import java.util.function.BiFunction;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import org.aopalliance.intercept.MethodInterceptor;
@@ -44,8 +45,6 @@ final class ProxyFactory<T> implements ConstructionProxyFactory<T> {
   private final Class<?> declaringClass;
   private final InvocationHandler[] callbacks;
 
-  private Enhancer enhancer;
-
   ProxyFactory(InjectionPoint injectionPoint, Iterable<MethodAspect> methodAspects) {
     this.injectionPoint = injectionPoint;
 
@@ -62,12 +61,10 @@ final class ProxyFactory<T> implements ConstructionProxyFactory<T> {
     if (applicableAspects.isEmpty()) {
       interceptors = ImmutableMap.of();
       callbacks = null;
-      enhancer = null;
       return;
     }
 
-    enhancer = BytecodeGen.newEnhancerForClass(declaringClass);
-    Method[] methods = enhancer.getEnhanceableMethods();
+    Method[] methods = BytecodeGen.getEnhanceableMethods(declaringClass);
 
     MethodInterceptorsPair[] methodInterceptorsPairs = null; // lazy
 
@@ -101,7 +98,6 @@ final class ProxyFactory<T> implements ConstructionProxyFactory<T> {
     if (methodInterceptorsPairs == null) {
       interceptors = ImmutableMap.of();
       callbacks = null;
-      enhancer = null;
       return;
     }
 
@@ -117,8 +113,11 @@ final class ProxyFactory<T> implements ConstructionProxyFactory<T> {
 
       List<MethodInterceptor> deDuplicated = pair.dedup();
       interceptorsMapBuilder.put(pair.method, deDuplicated);
+
+      BiFunction<Object, Object[], Object> superInvoker = BytecodeGen.newSuperInvoker(pair.method);
+
       callbacks[methodIndex] =
-          new InterceptorStackCallback(pair.method, deDuplicated, enhancer, methodIndex);
+          new InterceptorStackCallback(pair.method, deDuplicated, superInvoker);
     }
 
     interceptors = interceptorsMapBuilder.build();
@@ -138,7 +137,7 @@ final class ProxyFactory<T> implements ConstructionProxyFactory<T> {
     // Create the proxied class. We're careful to ensure that interceptor state is not-specific
     // to this injector. Otherwise, the proxies for each injector will waste PermGen memory
     try {
-      return new ProxyConstructor<T>(enhancer, injectionPoint, callbacks, interceptors);
+      return new ProxyConstructor<>(injectionPoint, callbacks, interceptors);
     } catch (Throwable e) {
       throw new Errors().errorEnhancingClass(declaringClass, e).toException();
     }
@@ -164,23 +163,20 @@ final class ProxyFactory<T> implements ConstructionProxyFactory<T> {
 
   /** Constructs instances that participate in AOP. */
   private static class ProxyConstructor<T> implements ConstructionProxy<T> {
-    final Enhancer enhancer;
     final InjectionPoint injectionPoint;
     final Constructor<T> constructor;
-    final int constructorIndex;
+    final BiFunction<Object[], InvocationHandler[], Object> enhancer;
     final InvocationHandler[] callbacks;
     final ImmutableMap<Method, List<MethodInterceptor>> methodInterceptors;
 
     @SuppressWarnings("unchecked") // the constructor promises to construct 'T's
     ProxyConstructor(
-        Enhancer enhancer,
         InjectionPoint injectionPoint,
         InvocationHandler[] callbacks,
         ImmutableMap<Method, List<MethodInterceptor>> methodInterceptors) {
-      this.enhancer = enhancer;
       this.injectionPoint = injectionPoint;
       this.constructor = (Constructor<T>) injectionPoint.getMember();
-      this.constructorIndex = enhancer.getConstructorIndex(constructor.getParameterTypes());
+      this.enhancer = BytecodeGen.newEnhancer(constructor);
       this.callbacks = callbacks;
       this.methodInterceptors = methodInterceptors;
     }
@@ -188,7 +184,7 @@ final class ProxyFactory<T> implements ConstructionProxyFactory<T> {
     @Override
     @SuppressWarnings("unchecked") // the enhancer promises to produce 'T's
     public T newInstance(Object... arguments) throws InvocationTargetException {
-      return (T) enhancer.newEnhancedInstance(constructorIndex, arguments, callbacks);
+      return (T) enhancer.apply(arguments, callbacks);
     }
 
     @Override

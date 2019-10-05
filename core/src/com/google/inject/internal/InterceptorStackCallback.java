@@ -24,6 +24,8 @@ import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
 import java.util.List;
 import java.util.Set;
+import java.util.function.BiFunction;
+
 import org.aopalliance.intercept.MethodInterceptor;
 import org.aopalliance.intercept.MethodInvocation;
 
@@ -40,15 +42,13 @@ final class InterceptorStackCallback implements InvocationHandler {
 
   final Method method;
   final MethodInterceptor[] interceptors;
-  final Enhancer enhancer;
-  final int methodIndex;
+  final BiFunction<Object, Object[], Object> superInvoker;
 
   public InterceptorStackCallback(
-      Method method, List<MethodInterceptor> interceptors, Enhancer enhancer, int methodIndex) {
+      Method method, List<MethodInterceptor> interceptors, BiFunction<Object, Object[], Object> superInvoker) {
     this.method = method;
     this.interceptors = interceptors.toArray(new MethodInterceptor[interceptors.size()]);
-    this.enhancer = enhancer;
-    this.methodIndex = methodIndex;
+    this.superInvoker = superInvoker;
   }
 
   @Override
@@ -72,7 +72,7 @@ final class InterceptorStackCallback implements InvocationHandler {
     public Object proceed() throws Throwable {
       try {
         return interceptorIndex == interceptors.length
-            ? enhancer.invokeOriginal(methodIndex, proxy, arguments)
+            ? superInvoker.apply(proxy, arguments)
             : interceptors[interceptorIndex].invoke(
                 new InterceptedMethodInvocation(proxy, arguments, interceptorIndex + 1));
       } catch (Throwable t) {

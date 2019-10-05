@@ -16,7 +16,6 @@
 
 package com.google.inject.internal;
 
-import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import com.google.inject.spi.InjectionPoint;
 import java.lang.reflect.Constructor;
@@ -24,6 +23,7 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.List;
+import java.util.function.Function;
 
 /**
  * Produces construction proxies that invoke the class constructor.
@@ -46,43 +46,38 @@ final class DefaultConstructionProxyFactory<T> implements ConstructionProxyFacto
 
     /*if[AOP]*/
     try {
-      FastClass fc = BytecodeGen.newFastClassForMember(constructor);
-      if (fc != null) {
-        int index = fc.getConstructorIndex(constructor.getParameterTypes());
-        // We could just fall back to reflection in this case but I believe this should actually
-        // be impossible.
-        Preconditions.checkArgument(
-            index >= 0, "Could not find constructor %s in fast class", constructor);
-        return new FastClassProxy<T>(injectionPoint, constructor, fc, index);
+      Function<Object[], Object> fastInvoker = BytecodeGen.newFastInvoker(constructor);
+      if (fastInvoker != null) {
+        return new FastProxy<>(injectionPoint, constructor, fastInvoker);
       }
     } catch (Exception | LinkageError e) {
       /* fall-through */
     }
     /*end[AOP]*/
 
-    return new ReflectiveProxy<T>(injectionPoint, constructor);
+    return new ReflectiveProxy<>(injectionPoint, constructor);
   }
 
   /*if[AOP]*/
   /** A {@link ConstructionProxy} that uses FastClass to invoke the constructor. */
-  private static final class FastClassProxy<T> implements ConstructionProxy<T> {
+  private static final class FastProxy<T> implements ConstructionProxy<T> {
     final InjectionPoint injectionPoint;
     final Constructor<T> constructor;
-    final FastClass fc;
-    final int index;
+    final Function<Object[], Object> fastInvoker;
 
-    private FastClassProxy(
-        InjectionPoint injectionPoint, Constructor<T> constructor, FastClass fc, int index) {
+    FastProxy(
+        InjectionPoint injectionPoint,
+        Constructor<T> constructor,
+        Function<Object[], Object> fastInvoker) {
       this.injectionPoint = injectionPoint;
       this.constructor = constructor;
-      this.fc = fc;
-      this.index = index;
+      this.fastInvoker = fastInvoker;
     }
 
     @Override
     @SuppressWarnings("unchecked")
     public T newInstance(Object... arguments) throws InvocationTargetException {
-      return (T) fc.newInstance(index, arguments);
+      return (T) fastInvoker.apply(arguments);
     }
 
     @Override
