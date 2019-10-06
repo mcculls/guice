@@ -101,6 +101,8 @@ final class ProxyFactory<T> implements ConstructionProxyFactory<T> {
       return;
     }
 
+    BytecodeGen.prepareEnhancer(declaringClass, methods);
+
     ImmutableMap.Builder<Method, List<MethodInterceptor>> interceptorsMapBuilder =
         ImmutableMap.builder();
 

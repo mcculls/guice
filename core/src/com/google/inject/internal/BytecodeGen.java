@@ -70,7 +70,12 @@ public final class BytecodeGen {
     throw new UnsupportedOperationException();
   }
 
-  /** Creates an enhancer for the given constructor's type using bytecode generation. */
+  /** Prepares the given type and methods for enhancement using bytecode generation. */
+  public static void prepareEnhancer(Class<?> type, Method[] methods) {
+    throw new UnsupportedOperationException();
+  }
+
+  /** Creates a new enhancer with the given constructor using bytecode generation. */
   public static BiFunction<Object[], InvocationHandler[], Object> newEnhancer(
       Constructor<?> constructor) {
     throw new UnsupportedOperationException();
