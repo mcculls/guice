@@ -1,8 +1,10 @@
 package com.google.inject;
 
+import com.google.common.util.concurrent.ExecutionError;
 import com.google.common.util.concurrent.UncheckedExecutionException;
 import com.google.inject.matcher.AbstractMatcher;
 import com.google.inject.matcher.Matchers;
+import java.util.concurrent.ExecutionException;
 import junit.framework.TestCase;
 import org.aopalliance.intercept.Invocation;
 import org.aopalliance.intercept.MethodInterceptor;
@@ -127,6 +129,30 @@ public class CglibRemovalTest extends TestCase {
       fail("should fail");
     } catch (ConfigurationException e) {
       assertTrue(e.getCause() instanceof IllegalArgumentException);
+    }
+  }
+
+  static class ConstructorThrowsException {
+    @Inject  static ConstructorThrowsException instance;
+
+    @Inject
+    ConstructorThrowsException() throws Exception {
+      throw  new ExecutionError("failed", new IllegalAccessError("failed"));
+    }
+  }
+
+  @Test
+  public void testStaticInjection() {
+    try {
+      Guice.createInjector(new AbstractModule() {
+        @Override
+        protected void configure() {
+          requestStaticInjection(ConstructorThrowsException.class);
+        }
+      });
+      fail("expected to fail");
+    } catch (CreationException e) {
+      // expected
     }
   }
 }
