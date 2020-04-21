@@ -23,10 +23,13 @@ import static com.google.inject.internal.aop.BytecodeTasks.packArguments;
 import static com.google.inject.internal.aop.BytecodeTasks.pushInteger;
 import static com.google.inject.internal.aop.BytecodeTasks.unbox;
 import static com.google.inject.internal.aop.BytecodeTasks.unpackArguments;
+import static java.lang.reflect.Modifier.ABSTRACT;
 import static java.lang.reflect.Modifier.FINAL;
+import static java.lang.reflect.Modifier.NATIVE;
 import static java.lang.reflect.Modifier.PRIVATE;
 import static java.lang.reflect.Modifier.PUBLIC;
 import static java.lang.reflect.Modifier.STATIC;
+import static java.lang.reflect.Modifier.SYNCHRONIZED;
 import static org.objectweb.asm.ClassWriter.COMPUTE_MAXS;
 import static org.objectweb.asm.Opcodes.AALOAD;
 import static org.objectweb.asm.Opcodes.ACC_SUPER;
@@ -109,9 +112,14 @@ final class Enhancer extends AbstractGlueGenerator {
 
   private final Map<Method, Method> bridgeDelegates;
 
+  private final String checkcastToProxy;
+
   public Enhancer(Class<?> hostClass, Map<Method, Method> bridgeDelegates) {
     super(hostClass, ENHANCER_BY_GUICE_MARKER);
     this.bridgeDelegates = bridgeDelegates;
+
+    // CHECKCAST(proxyName) fails when hosted anonymously; hostName works in that scenario
+    this.checkcastToProxy = ClassDefining.isAnonymousHost(hostClass) ? hostName : proxyName;
   }
 
   @Override
@@ -119,7 +127,7 @@ final class Enhancer extends AbstractGlueGenerator {
     ClassWriter cw = new ClassWriter(COMPUTE_MAXS);
     MethodVisitor mv;
 
-    cw.visit(V1_8, PUBLIC | FINAL | ACC_SUPER, proxyName, null, hostName, null);
+    cw.visit(V1_8, PUBLIC | ACC_SUPER, proxyName, null, hostName, null);
 
     cw.visitField(PUBLIC | STATIC | FINAL, INVOKERS_NAME, INVOKERS_DESCRIPTOR, null, null)
         .visitEnd();
@@ -223,7 +231,7 @@ final class Enhancer extends AbstractGlueGenerator {
   private void enhanceMethod(ClassWriter cw, Method method, int methodIndex) {
     MethodVisitor mv =
         cw.visitMethod(
-            PUBLIC,
+            FINAL | (method.getModifiers() & ~(ABSTRACT | NATIVE | SYNCHRONIZED)),
             method.getName(),
             Type.getMethodDescriptor(method),
             null,
@@ -281,8 +289,7 @@ final class Enhancer extends AbstractGlueGenerator {
 
     mv.visitInsn(ACONST_NULL);
     mv.visitVarInsn(ALOAD, 1);
-    // JVM seems to prefer different casting when using defineAnonymous vs child-loader
-    mv.visitTypeInsn(CHECKCAST, ClassDefining.hasPackageAccess() ? hostName : proxyName);
+    mv.visitTypeInsn(CHECKCAST, checkcastToProxy);
     unpackArguments(mv, target.getParameterTypes());
 
     mv.visitMethodInsn(
@@ -300,19 +307,19 @@ final class Enhancer extends AbstractGlueGenerator {
   private void generateVirtualBridge(ClassWriter cw, Method bridge, Method target) {
     MethodVisitor mv =
         cw.visitMethod(
-            PUBLIC,
+            FINAL | (bridge.getModifiers() & ~(ABSTRACT | NATIVE | SYNCHRONIZED)),
             bridge.getName(),
             Type.getMethodDescriptor(bridge),
             null,
             exceptionNames(bridge));
 
     mv.visitVarInsn(ALOAD, 0);
-    mv.visitTypeInsn(CHECKCAST, hostName);
-    int slot = 1;
+    mv.visitTypeInsn(CHECKCAST, checkcastToProxy);
 
     Class<?>[] bridgeParameterTypes = bridge.getParameterTypes();
     Class<?>[] targetParameterTypes = target.getParameterTypes();
 
+    int slot = 1;
     for (int i = 0, len = targetParameterTypes.length; i < len; i++) {
       Class<?> parameterType = targetParameterTypes[i];
       slot += loadArgument(mv, parameterType, slot);
