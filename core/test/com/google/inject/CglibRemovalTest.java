@@ -1,9 +1,12 @@
 package com.google.inject;
 
+import com.google.common.testing.NullPointerTester;
+import com.google.common.testing.NullPointerTester.Visibility;
 import com.google.common.util.concurrent.ExecutionError;
 import com.google.common.util.concurrent.UncheckedExecutionException;
 import com.google.inject.matcher.AbstractMatcher;
 import com.google.inject.matcher.Matchers;
+import com.google.inject.testing.NullpointerObject;
 import java.util.concurrent.ExecutionException;
 import junit.framework.TestCase;
 import org.aopalliance.intercept.Invocation;
@@ -21,6 +24,7 @@ import java.lang.reflect.Method;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 
+import static org.mockito.Matchers.any;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 
@@ -154,5 +158,38 @@ public class CglibRemovalTest extends TestCase {
     } catch (CreationException e) {
       // expected
     }
+  }
+
+
+  static class Foo {
+    @Inject
+    Foo() {
+      throw new AssertionError("fail!");
+    }
+  }
+
+  @Test
+  public void testAssertionErrorInConstructor() {
+    Injector injector =    Guice.createInjector();
+    try {
+      injector.getInstance(Foo.class);
+      fail("expected to throw exception");
+    } catch (RuntimeException e) {
+      // expected.
+    }
+  }
+
+  @Test
+  public void testEnhancedMethodVisibility() {
+    NullpointerObject object = Guice.createInjector(
+        new AbstractModule() {
+          @Override
+          protected void configure() {
+            bindInterceptor(Matchers.any(), Matchers.annotatedWith(NullpointerObject.Intercept.class),
+                invocation -> invocation.proceed());
+          }
+        }
+    ).getInstance(NullpointerObject.class);
+    new NullPointerTester().testAllPublicInstanceMethods(object);
   }
 }
