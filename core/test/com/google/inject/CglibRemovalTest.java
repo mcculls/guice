@@ -1,19 +1,15 @@
 package com.google.inject;
 
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.verify;
+
 import com.google.common.testing.NullPointerTester;
-import com.google.common.testing.NullPointerTester.Visibility;
 import com.google.common.util.concurrent.ExecutionError;
 import com.google.common.util.concurrent.UncheckedExecutionException;
 import com.google.inject.matcher.AbstractMatcher;
 import com.google.inject.matcher.Matchers;
 import com.google.inject.testing.NullpointerObject;
-import java.util.concurrent.ExecutionException;
-import junit.framework.TestCase;
-import org.aopalliance.intercept.Invocation;
-import org.aopalliance.intercept.MethodInterceptor;
-import org.aopalliance.intercept.MethodInvocation;
-import org.junit.Test;
-
+import java.lang.annotation.Inherited;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.invoke.CallSite;
@@ -21,12 +17,9 @@ import java.lang.invoke.LambdaMetafactory;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
 import java.lang.reflect.Method;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
-
-import static org.mockito.Matchers.any;
-import static org.mockito.Mockito.spy;
-import static org.mockito.Mockito.verify;
+import junit.framework.TestCase;
+import org.junit.Test;
 
 public class CglibRemovalTest extends TestCase {
   interface Interface {
@@ -191,5 +184,53 @@ public class CglibRemovalTest extends TestCase {
         }
     ).getInstance(NullpointerObject.class);
     new NullPointerTester().testAllPublicInstanceMethods(object);
+  }
+
+  @Retention(RetentionPolicy.RUNTIME)
+  @Inherited
+  @interface Measure {}
+
+  static abstract class Base<T> {
+    protected final T t;
+
+    protected Base(T t) {
+      this.t = t;
+    }
+
+    protected  T getT() {return t;}
+  }
+
+  static abstract class Subclass<F> extends Base<String> {
+    protected Subclass(String t) {
+      super(t);
+    }
+
+    protected abstract void otherMethod(F f);
+
+    @Override
+    protected final String getT() {return t;}
+  }
+
+  @Measure
+  static class SubSubClass extends Subclass<String> {
+    @Inject
+    SubSubClass() {
+      super("");
+    }
+
+    @Override
+    protected final void otherMethod(String s) {}
+  }
+
+  @Test
+  public void testOverrideFinalMethod() {
+    Class<?> c = Guice.createInjector(new AbstractModule() {
+      @Override
+      protected void configure() {
+        bindInterceptor(Matchers.annotatedWith(Measure.class), Matchers.any(), invocation -> invocation.proceed());
+      }
+    }).getInstance(SubSubClass.class)
+    .getClass();
+    assertNotNull(c.getCanonicalName());
   }
 }

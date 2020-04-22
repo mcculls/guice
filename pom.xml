@@ -184,7 +184,7 @@ See the Apache License Version 2.0 for the specific language governing permissio
     <dependency>
       <groupId>org.mockito</groupId>
       <artifactId>mockito-all</artifactId>
-      <version>1.9.5</version>
+      <version>1.10.19</version>
       <scope>test</scope>
     </dependency>
   </dependencies>
